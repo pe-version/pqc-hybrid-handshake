@@ -6,7 +6,10 @@ on:
   pull_request:
 
 env:
-  LIBOQS_VERSION: 0.10.0
+  # Track liboqs main: PyPI only ships liboqs-python==0.14.1, which references
+  # symbols that haven't appeared in any tagged liboqs release yet (and its
+  # bundled auto-install expects a non-existent "0.14.1" tag).
+  LIBOQS_REF: main
 
 jobs:
   test:
@@ -27,7 +30,7 @@ jobs:
 
       - name: Build and install liboqs to /usr/local
         run: |
-          git clone --depth 1 --branch ${LIBOQS_VERSION} https://github.com/open-quantum-safe/liboqs.git
+          git clone --depth 1 --branch ${LIBOQS_REF} https://github.com/open-quantum-safe/liboqs.git
           cd liboqs && mkdir build && cd build
           cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON ..
           sudo ninja install

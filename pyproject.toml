@@ -25,11 +25,12 @@ classifiers = [
 ]
 dependencies = [
     "cryptography>=41.0",
-    # Pin liboqs-python to the same minor as the liboqs C library installed
-    # by CI / Dockerfile / README install snippet (currently 0.10.x). Newer
-    # liboqs-python builds reference symbols (e.g. OQS_SIG_supports_ctx_str)
-    # added in liboqs >0.10 and will fail to load against a 0.10 .so.
-    "liboqs-python>=0.10,<0.11",
+    # liboqs-python version must match the liboqs C library ABI. The only
+    # version published to PyPI as of this writing is 0.14.1, which expects
+    # symbols present in liboqs main (the bundled auto-install references
+    # a liboqs "0.14.1" tag that does not exist, so the CI, Dockerfile, and
+    # README instructions all build liboqs from main for API compatibility).
+    "liboqs-python>=0.14",
 ]
 
 [project.optional-dependencies]
