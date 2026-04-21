@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pqc-hybrid-handshake"
+version = "0.1.0"
+description = "End-to-end hybrid X25519 + ML-KEM-768 key exchange demo using liboqs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Philip Eykamp" }]
+keywords = ["pqc", "post-quantum", "hybrid", "kyber", "ml-kem", "x25519", "liboqs"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = [
+    "cryptography>=41.0",
+    "liboqs-python>=0.10",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+]
+
+[project.scripts]
+pqc-hybrid-handshake = "pqc_hybrid_handshake.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pqc_hybrid_handshake"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

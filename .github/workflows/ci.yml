@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  LIBOQS_VERSION: 0.10.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install liboqs build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build libssl-dev
+
+      - name: Cache liboqs install
+        id: cache-liboqs
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/oqs
+          key: liboqs-${{ env.LIBOQS_VERSION }}-${{ runner.os }}
+
+      - name: Build and install liboqs
+        if: steps.cache-liboqs.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch ${LIBOQS_VERSION} https://github.com/open-quantum-safe/liboqs.git
+          cd liboqs && mkdir build && cd build
+          cmake -GNinja -DCMAKE_INSTALL_PREFIX=$HOME/.local/oqs -DOQS_BUILD_ONLY_LIB=ON ..
+          ninja install
+
+      - name: Expose liboqs to Python binding
+        run: |
+          echo "LD_LIBRARY_PATH=$HOME/.local/oqs/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$HOME/.local/oqs/lib/pkgconfig:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+
+      - run: pip install -e ".[dev]"
+      - run: pytest -v
+      - name: Run the demo
+        run: python -m pqc_hybrid_handshake
