@@ -107,6 +107,11 @@ Latency (single in-process handshake; not a benchmark):
 - The X-Wing combiner ([`draft-connolly-cfrg-xwing-kem`](https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-06.html)). X-Wing is the more rigorous specifically-designed combiner for ML-KEM + X25519. The IETF TLS hybrid drafts and most current deployments use the simpler HKDF-over-concatenation approach this demo uses; X-Wing is on the roadmap.
 - Production code. Treat it as a learning artifact and a starting point.
 
+## Compliance notes
+
+- **FIPS 140-3 / CMVP.** This demo links against [`liboqs`](https://github.com/open-quantum-safe/liboqs) via [`liboqs-python`](https://github.com/open-quantum-safe/liboqs-python). `liboqs` is **not on the CMVP Active list** and is explicitly self-described as research-grade. Treat the post-quantum side of this handshake as a *prototype*, not a validated cryptographic module. Federal or otherwise regulated environments that require a FIPS 140-3 boundary should wait for CMVP-validated PQC modules or use a vendor implementation that has one.
+- **CNSA 2.0 parameter selection.** This demo uses **ML-KEM-768** (NIST Category 3) and AES-256 for portability and small wire size. Systems classified as National Security Systems (NSS) under [NSA CNSA 2.0](https://media.defense.gov/2022/Sep/07/2003071834/-1/-1/0/CSA_CNSA_2.0_ALGORITHMS_.PDF) require **ML-KEM-1024** (Category 5) and matching ML-DSA-87 for signatures. Swap the `KEM_NAME` constant in [`src/pqc_hybrid_handshake/handshake.py`](src/pqc_hybrid_handshake/handshake.py) for NSS-aligned use.
+
 ## Roadmap
 
 - [ ] TCP socket version (real network handshake with on-wire bytes shown).
