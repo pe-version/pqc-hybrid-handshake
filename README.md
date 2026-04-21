@@ -30,7 +30,7 @@ pip install -e .
 sudo apt install -y cmake ninja-build libssl-dev
 git clone --depth 1 --branch 0.10.0 https://github.com/open-quantum-safe/liboqs.git
 cd liboqs && mkdir build && cd build
-cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_BUILD_ONLY_LIB=ON ..
+cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON ..
 sudo ninja install
 sudo ldconfig
 cd ../..

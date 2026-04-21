@@ -10,7 +10,7 @@ RUN apt-get update \
 RUN git clone --depth 1 --branch ${LIBOQS_VERSION} \
         https://github.com/open-quantum-safe/liboqs.git /tmp/liboqs \
     && mkdir /tmp/liboqs/build && cd /tmp/liboqs/build \
-    && cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_BUILD_ONLY_LIB=ON .. \
+    && cmake -GNinja -DCMAKE_INSTALL_PREFIX=/usr/local -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON .. \
     && ninja install \
     && ldconfig \
     && rm -rf /tmp/liboqs
