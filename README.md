@@ -116,7 +116,8 @@ Latency (single in-process handshake; not a benchmark):
 
 ## Related work
 
-This demo is a companion piece to [`pqc-readiness-scanner`](https://github.com/pe-version/pqc-readiness-scanner) (a CLI for inventorying quantum-vulnerable cryptography in code, certs, and TLS endpoints).
+- [`pqc-readiness-scanner`](https://github.com/pe-version/pqc-readiness-scanner) — Python CLI for inventorying quantum-vulnerable cryptography in code, X.509 certs, SSH keys, and live TLS endpoints (with SARIF / CycloneDX 1.6 CBOM / OMB M-23-02 inventory CSV outputs).
+- [`pqc-semgrep-rules`](https://github.com/pe-version/pqc-semgrep-rules) — Semgrep ruleset flagging the same quantum-vulnerable algorithms across Python, JavaScript/TypeScript, Go, and Java. Drops into existing client CI.
 
 ## License
 
