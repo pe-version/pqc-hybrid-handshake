@@ -15,3 +15,7 @@ htmlcov/
 .idea/
 .vscode/
 liboqs/
+
+# Local-only notes; never tracked.
+*.local.md
+*.local.txt

@@ -19,9 +19,33 @@ The post-quantum side uses [`liboqs`](https://github.com/open-quantum-safe/liboq
 
 ### macOS
 
+The `liboqs` Homebrew formula ships only a **static** archive (`liboqs.a`), which Python's `ctypes`-based `oqs` binding cannot load — it requires a shared library (`.dylib`). Build from source instead, mirroring the Linux instructions:
+
 ```bash
-brew install liboqs
-pip install -e .
+brew install cmake ninja
+git clone --depth 1 https://github.com/open-quantum-safe/liboqs.git
+cd liboqs && mkdir build && cd build
+cmake -GNinja -DCMAKE_INSTALL_PREFIX="$HOME/liboqs-install" \
+  -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON ..
+ninja && ninja install
+# Make the lib discoverable by ctypes.util.find_library:
+mkdir -p "$HOME/lib" && ln -sf "$HOME/liboqs-install/lib/liboqs.dylib" "$HOME/lib/liboqs.dylib"
+cd ../.. && pip install -e .
+```
+
+#### Apple Silicon note
+
+If `which brew` returns `/usr/local/bin/brew`, you are running the **Intel-arch Homebrew under Rosetta**, which will produce an x86_64 `liboqs.dylib` that fails to load into a native arm64 Python with `incompatible architecture` errors.
+
+Long-term fix: install the arm64 Homebrew at `/opt/homebrew` and use that for all native development. The migration is documented at <https://docs.brew.sh/Installation>; once installed, reinstall `cmake` and `ninja` under the arm64 brew before rebuilding `liboqs`.
+
+Short-term workaround (if you need it working today and plan to migrate later): force the cross-compile target and skip algorithms with x86-only inline assembly — only ML-KEM is needed for this demo:
+
+```bash
+cmake -GNinja -DCMAKE_INSTALL_PREFIX="$HOME/liboqs-install" \
+  -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DOQS_MINIMAL_BUILD="KEM_ml_kem_512;KEM_ml_kem_768;KEM_ml_kem_1024" ..
 ```
 
 ### Linux (Ubuntu/Debian)
