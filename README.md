@@ -1,5 +1,7 @@
 # pqc-hybrid-handshake
 
+[![CI](https://github.com/pe-version/pqc-hybrid-handshake/actions/workflows/ci.yml/badge.svg)](https://github.com/pe-version/pqc-hybrid-handshake/actions/workflows/ci.yml)
+
 > A working end-to-end **hybrid X25519 + ML-KEM-768** key exchange in Python, using [`liboqs`](https://github.com/open-quantum-safe/liboqs) for the post-quantum half. The same construction major TLS deployments (Cloudflare, Chrome, AWS) are rolling out today.
 
 ## Why hybrid?
@@ -15,7 +17,7 @@ This demo shows the construction in working code: two parties (Alice and Bob) ru
 
 ## Install
 
-The post-quantum side uses [`liboqs`](https://github.com/open-quantum-safe/liboqs), a C library, via the Python binding [`liboqs-python`](https://github.com/open-quantum-safe/liboqs-python). You need to install `liboqs` first, then `pip install` this project.
+The package itself is pure Python and runs anywhere; the per-OS notes below cover installing the [`liboqs`](https://github.com/open-quantum-safe/liboqs) C library and its Python binding [`liboqs-python`](https://github.com/open-quantum-safe/liboqs-python). CI validates on Ubuntu (Python 3.10–3.12) on every push — see the badge above.
 
 ### macOS
 
@@ -26,27 +28,21 @@ brew install cmake ninja
 git clone --depth 1 https://github.com/open-quantum-safe/liboqs.git
 cd liboqs && mkdir build && cd build
 cmake -GNinja -DCMAKE_INSTALL_PREFIX="$HOME/liboqs-install" \
-  -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON ..
+  -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON \
+  -DOQS_USE_OPENSSL=OFF ..
 ninja && ninja install
 # Make the lib discoverable by ctypes.util.find_library:
 mkdir -p "$HOME/lib" && ln -sf "$HOME/liboqs-install/lib/liboqs.dylib" "$HOME/lib/liboqs.dylib"
 cd ../.. && pip install -e .
 ```
 
+`-DOQS_USE_OPENSSL=OFF` opts liboqs out of OpenSSL for SHA / AES / RAND helpers and uses its own bundled implementations. This avoids a runtime link dependency on a separately-installed OpenSSL (and the matching architecture/version dance), at the cost of slightly less optimized symmetric primitives — fine for this demo and for any setup that doesn't already have an OpenSSL build matching the target arch.
+
 #### Apple Silicon note
 
 If `which brew` returns `/usr/local/bin/brew`, you are running the **Intel-arch Homebrew under Rosetta**, which will produce an x86_64 `liboqs.dylib` that fails to load into a native arm64 Python with `incompatible architecture` errors.
 
-Long-term fix: install the arm64 Homebrew at `/opt/homebrew` and use that for all native development. The migration is documented at <https://docs.brew.sh/Installation>; once installed, reinstall `cmake` and `ninja` under the arm64 brew before rebuilding `liboqs`.
-
-Short-term workaround (if you need it working today and plan to migrate later): force the cross-compile target and skip algorithms with x86-only inline assembly — only ML-KEM is needed for this demo:
-
-```bash
-cmake -GNinja -DCMAKE_INSTALL_PREFIX="$HOME/liboqs-install" \
-  -DOQS_BUILD_ONLY_LIB=ON -DBUILD_SHARED_LIBS=ON \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DOQS_MINIMAL_BUILD="KEM_ml_kem_512;KEM_ml_kem_768;KEM_ml_kem_1024" ..
-```
+The verified fix is to install the arm64 Homebrew at `/opt/homebrew` and use it for all native development. The migration is documented at <https://docs.brew.sh/Installation>; once installed, run `cmake` and `ninja` from `/opt/homebrew/bin` and follow the build above. The two brews coexist cleanly — your existing `/usr/local` brew can stay for any x86_64-only dependencies you have under Rosetta.
 
 ### Linux (Ubuntu/Debian)
 
@@ -61,7 +57,11 @@ cd ../..
 pip install -e .
 ```
 
-### Docker (skip the install dance)
+### Windows
+
+Both `cryptography` and `liboqs` support Windows, and `liboqs-python` loads `.dll` libraries on Windows. This project has not been tested on Windows directly; see the [`liboqs` repository](https://github.com/open-quantum-safe/liboqs) for the current Windows build instructions, or use the Docker route below — Docker Desktop runs on Windows and bypasses the native build entirely.
+
+### Docker (skip the install dance — runs on macOS, Linux, and Windows)
 
 ```bash
 docker build -t pqc-hybrid-handshake .
