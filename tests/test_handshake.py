@@ -56,6 +56,23 @@ def test_combiner_is_deterministic():
     assert derive_combined_key(cs, ps, transcript) == derive_combined_key(cs, ps, transcript)
 
 
+def test_transcript_binding_resists_one_byte_tamper():
+    """Sibling to test_combiner_is_deterministic: same secrets + same transcript
+    → same key (determinism); same secrets + tampered transcript → different
+    keys. Together they characterize transcript binding: a MitM flipping any
+    byte of any public value causes Alice and Bob to derive distinct session
+    keys, so the AEAD on first use fails to authenticate.
+    """
+    cs = b"\x11" * 32
+    ps = b"\x22" * 32
+    honest_transcript = b"bob_pub" + b"kem_pub" + b"alice_pub" + b"ciphertext"
+    tampered = bytearray(honest_transcript)
+    tampered[7] ^= 0x01  # flip one bit of "kem_pub"
+    assert derive_combined_key(cs, ps, honest_transcript) != derive_combined_key(
+        cs, ps, bytes(tampered)
+    )
+
+
 def test_combiner_changes_when_pq_secret_changes():
     cs = b"\x11" * 32
     ps_a = b"\x22" * 32
