@@ -82,27 +82,36 @@ def run_handshake() -> HandshakeResult:
     bob_x25519_priv = X25519PrivateKey.generate()
     bob_x25519_pub_bytes = _x25519_pub_bytes(bob_x25519_priv.public_key())
 
-    bob_kem = oqs.KeyEncapsulation(KEM_NAME)
-    bob_kem_pub_bytes = bob_kem.generate_keypair()
+    # KEM state is managed via context managers and freed at the earliest
+    # point it's no longer needed, per the minimum-lifetime principle. The
+    # X25519 private keys and derived `bytes` secrets below are not
+    # explicitly zeroized — `cryptography` doesn't expose that, and Python
+    # bytes are immutable. A hardened deployment would use a native-level
+    # binding (libsodium-style `sodium_memzero` on caller-owned buffers)
+    # to close that gap; doing so cleanly requires leaving idiomatic Python.
+    with oqs.KeyEncapsulation(KEM_NAME) as bob_kem:
+        bob_kem_pub_bytes = bob_kem.generate_keypair()
 
-    # 2. Alice generates an ephemeral X25519 key and ML-KEM-encapsulates against
-    #    Bob's KEM public key. Note: ML-KEM encapsulation is sender-side only;
-    #    Alice does not need her own ML-KEM keypair for this direction.
-    alice_x25519_priv = X25519PrivateKey.generate()
-    alice_x25519_pub_bytes = _x25519_pub_bytes(alice_x25519_priv.public_key())
+        # 2. Alice generates an ephemeral X25519 key and ML-KEM-encapsulates against
+        #    Bob's KEM public key. Note: ML-KEM encapsulation is sender-side only;
+        #    Alice does not need her own ML-KEM keypair for this direction.
+        alice_x25519_priv = X25519PrivateKey.generate()
+        alice_x25519_pub_bytes = _x25519_pub_bytes(alice_x25519_priv.public_key())
 
-    alice_kem = oqs.KeyEncapsulation(KEM_NAME)
-    pq_ciphertext, alice_pq_secret = alice_kem.encap_secret(bob_kem_pub_bytes)
+        with oqs.KeyEncapsulation(KEM_NAME) as alice_kem:
+            pq_ciphertext, alice_pq_secret = alice_kem.encap_secret(bob_kem_pub_bytes)
+        # alice_kem freed — encapsulation is sender-side-only; nothing else needs it.
 
-    # 3. Both sides compute their classical X25519 shared secret independently.
-    bob_x25519_pub = X25519PublicKey.from_public_bytes(bob_x25519_pub_bytes)
-    alice_classical_secret = alice_x25519_priv.exchange(bob_x25519_pub)
+        # 3. Both sides compute their classical X25519 shared secret independently.
+        bob_x25519_pub = X25519PublicKey.from_public_bytes(bob_x25519_pub_bytes)
+        alice_classical_secret = alice_x25519_priv.exchange(bob_x25519_pub)
 
-    alice_x25519_pub = X25519PublicKey.from_public_bytes(alice_x25519_pub_bytes)
-    bob_classical_secret = bob_x25519_priv.exchange(alice_x25519_pub)
+        alice_x25519_pub = X25519PublicKey.from_public_bytes(alice_x25519_pub_bytes)
+        bob_classical_secret = bob_x25519_priv.exchange(alice_x25519_pub)
 
-    # 4. Bob decapsulates the ML-KEM ciphertext with his secret key.
-    bob_pq_secret = bob_kem.decap_secret(pq_ciphertext)
+        # 4. Bob decapsulates the ML-KEM ciphertext with his secret key.
+        bob_pq_secret = bob_kem.decap_secret(pq_ciphertext)
+    # bob_kem freed — KEM state is no longer needed for HKDF below.
 
     # 5. Both derive the same session key from (classical_secret, pq_secret),
     #    salted by the full handshake transcript. The transcript binding is
@@ -129,9 +138,6 @@ def run_handshake() -> HandshakeResult:
         + len(alice_x25519_pub_bytes)
         + len(pq_ciphertext)
     )
-
-    bob_kem.free()
-    alice_kem.free()
 
     return HandshakeResult(
         shared_key=alice_key,
