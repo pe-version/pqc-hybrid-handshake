@@ -19,3 +19,4 @@ liboqs/
 # Local-only notes; never tracked.
 *.local.md
 *.local.txt
+next-session-claude-context.md
