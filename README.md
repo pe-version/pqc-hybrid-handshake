@@ -131,6 +131,31 @@ Latency (single in-process handshake; not a benchmark):
 - The X-Wing combiner ([`draft-connolly-cfrg-xwing-kem`](https://www.ietf.org/archive/id/draft-connolly-cfrg-xwing-kem-06.html)). X-Wing is the more rigorous specifically-designed combiner for ML-KEM + X25519. The IETF TLS hybrid drafts and most current deployments use the simpler HKDF-over-concatenation approach this demo uses; X-Wing is on the roadmap.
 - Production code. Treat it as a learning artifact and a starting point.
 
+## Testing
+
+The CI workflow at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest -v` on every push against a fresh build of `liboqs` `main`, on Python 3.10 / 3.11 / 3.12 (Ubuntu). That's the source of truth for whether the test suite passes.
+
+Locally:
+
+```bash
+.venv/bin/python -m pytest
+```
+
+Tests have a 10-second per-test timeout (configured via `pytest-timeout` in `pyproject.toml`). The full suite normally completes in well under one second; the timeout exists so that runaway hangs in native-library load paths or RNG calls self-kill rather than blocking the run.
+
+### Troubleshooting: pytest hangs at startup
+
+If `pytest` hangs at module import (rather than during a test), `pytest-timeout` cannot help — the timeout only fires once a test starts running. The most common cause is a stuck Python process from an earlier session holding a `dyld` lock during `dlopen` of `liboqs`. Symptom: a freshly-started `pytest` sits with no output for minutes, and `ps -ax | grep pytest` shows multiple `python -m pytest` processes accumulating.
+
+To clear it:
+
+```bash
+# Kill all Python processes related to this project. Project-scoped via -f match.
+pkill -9 -f pqc_hybrid_handshake
+```
+
+If the hang persists, close your terminal tab (or all tabs running Claude Code / shells touching this project) — that sends `SIGHUP` to all child processes and forces macOS to release the shared `dyld` cache lock. As a last resort, log out and back in, or reboot. New shells will then run `pytest` cleanly.
+
 ## Compliance notes
 
 - **FIPS 140-3 / CMVP.** This demo links against [`liboqs`](https://github.com/open-quantum-safe/liboqs) via [`liboqs-python`](https://github.com/open-quantum-safe/liboqs-python). `liboqs` is **not on the CMVP Active list** and is explicitly self-described as research-grade. Treat the post-quantum side of this handshake as a *prototype*, not a validated cryptographic module. Federal or otherwise regulated environments that require a FIPS 140-3 boundary should wait for CMVP-validated PQC modules or use a vendor implementation that has one.

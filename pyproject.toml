@@ -36,6 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.4",
+    "pytest-timeout>=2.1",
 ]
 
 [project.scripts]
@@ -47,3 +48,7 @@ packages = ["src/pqc_hybrid_handshake"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+# Per-test timeout. Tests that hang (typically on a native-library load or
+# RNG path) self-kill after this many seconds rather than blocking the run.
+# 10s is huge headroom — the full suite normally completes in under 0.2s.
+timeout = 10
