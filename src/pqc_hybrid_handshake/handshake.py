@@ -30,8 +30,22 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 
-KEM_NAME = "ML-KEM-768"
-HKDF_INFO = b"pqc-hybrid-handshake/v1/x25519+ml-kem-768"
+DEFAULT_KEM = "ML-KEM-768"
+CNSA_2_KEM = "ML-KEM-1024"
+KEM_NAME = DEFAULT_KEM  # back-compat alias
+
+
+def _hkdf_info_for(kem_name: str) -> bytes:
+    """Bind HKDF info to the chosen KEM parameter set.
+
+    Different KEM sizes are different protocols; including the name here
+    domain-separates derived keys so a session run with ML-KEM-1024 can
+    never collide with one run at ML-KEM-768.
+    """
+    return f"pqc-hybrid-handshake/v1/x25519+{kem_name.lower()}".encode()
+
+
+HKDF_INFO = _hkdf_info_for(DEFAULT_KEM)  # back-compat alias
 
 
 @dataclass
@@ -42,6 +56,7 @@ class HandshakeResult:
     pq_pk_bytes: int
     pq_ciphertext_bytes: int
     duration_ms: float
+    kem_name: str = DEFAULT_KEM
 
 
 def derive_combined_key(
@@ -49,6 +64,7 @@ def derive_combined_key(
     pq_secret: bytes,
     transcript: bytes,
     length: int = 32,
+    info: bytes = HKDF_INFO,
 ) -> bytes:
     """Derive the session key from both shared secrets.
 
@@ -62,7 +78,7 @@ def derive_combined_key(
         algorithm=hashes.SHA256(),
         length=length,
         salt=transcript,
-        info=HKDF_INFO,
+        info=info,
     ).derive(classical_secret + pq_secret)
 
 
@@ -70,15 +86,19 @@ def _x25519_pub_bytes(pub: X25519PublicKey) -> bytes:
     return pub.public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
 
 
-def run_handshake() -> HandshakeResult:
+def run_handshake(kem_name: str = DEFAULT_KEM) -> HandshakeResult:
     """Simulate Alice (initiator) and Bob (responder) doing a hybrid key exchange.
+
+    Pass ``kem_name="ML-KEM-1024"`` for the CNSA 2.0 / NSA top-secret-grade
+    parameter set; the default is ML-KEM-768 (CNSA 2.0 SECRET-grade).
 
     Returns a HandshakeResult containing the (shared) derived key plus
     bookkeeping on wire-byte cost and end-to-end duration.
     """
     start = time.perf_counter()
+    hkdf_info = _hkdf_info_for(kem_name)
 
-    # 1. Bob has a long-ish-lived hybrid keypair: X25519 + ML-KEM-768.
+    # 1. Bob has a long-ish-lived hybrid keypair: X25519 + the chosen ML-KEM.
     bob_x25519_priv = X25519PrivateKey.generate()
     bob_x25519_pub_bytes = _x25519_pub_bytes(bob_x25519_priv.public_key())
 
@@ -89,7 +109,7 @@ def run_handshake() -> HandshakeResult:
     # bytes are immutable. A hardened deployment would use a native-level
     # binding (libsodium-style `sodium_memzero` on caller-owned buffers)
     # to close that gap; doing so cleanly requires leaving idiomatic Python.
-    with oqs.KeyEncapsulation(KEM_NAME) as bob_kem:
+    with oqs.KeyEncapsulation(kem_name) as bob_kem:
         bob_kem_pub_bytes = bob_kem.generate_keypair()
 
         # 2. Alice generates an ephemeral X25519 key and ML-KEM-encapsulates against
@@ -98,7 +118,7 @@ def run_handshake() -> HandshakeResult:
         alice_x25519_priv = X25519PrivateKey.generate()
         alice_x25519_pub_bytes = _x25519_pub_bytes(alice_x25519_priv.public_key())
 
-        with oqs.KeyEncapsulation(KEM_NAME) as alice_kem:
+        with oqs.KeyEncapsulation(kem_name) as alice_kem:
             pq_ciphertext, alice_pq_secret = alice_kem.encap_secret(bob_kem_pub_bytes)
         # alice_kem freed — encapsulation is sender-side-only; nothing else needs it.
 
@@ -124,8 +144,12 @@ def run_handshake() -> HandshakeResult:
         + alice_x25519_pub_bytes
         + pq_ciphertext
     )
-    alice_key = derive_combined_key(alice_classical_secret, alice_pq_secret, transcript)
-    bob_key = derive_combined_key(bob_classical_secret, bob_pq_secret, transcript)
+    alice_key = derive_combined_key(
+        alice_classical_secret, alice_pq_secret, transcript, info=hkdf_info
+    )
+    bob_key = derive_combined_key(
+        bob_classical_secret, bob_pq_secret, transcript, info=hkdf_info
+    )
 
     if alice_key != bob_key:
         raise RuntimeError("hybrid key derivation mismatch — bug")
@@ -146,6 +170,7 @@ def run_handshake() -> HandshakeResult:
         pq_pk_bytes=len(bob_kem_pub_bytes),
         pq_ciphertext_bytes=len(pq_ciphertext),
         duration_ms=duration_ms,
+        kem_name=kem_name,
     )
 
 
